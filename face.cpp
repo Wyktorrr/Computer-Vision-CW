@@ -13,12 +13,16 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include <iostream>
 #include <stdio.h>
+#include <fstream>
 
 using namespace std;
 using namespace cv;
 
+ifstream fin("noentry1gt.txt");
+
 /** Function Headers */
 void detectAndDisplay( Mat frame );
+//void detectAndDisplayGroundTruth( Mat frame );
 
 /** Global variables */
 String cascade_name = "frontalface.xml";
@@ -46,6 +50,10 @@ int main( int argc, const char** argv )
 /** @function detectAndDisplay */
 void detectAndDisplay( Mat frame )
 {
+    int x, y, width, height, bottomrightx, bottomrighty;
+	string line;
+	unsigned int truenooffaces = 0;
+
 	std::vector<Rect> faces;
 	Mat frame_gray;
 
@@ -65,4 +73,15 @@ void detectAndDisplay( Mat frame )
 		rectangle(frame, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height), Scalar( 0, 255, 0 ), 2);
 	}
 
+    while((fin >> x >> y >> width >> height) && getline(fin, line)) {
+		//cout << x << y << width << height << "\n";
+		truenooffaces++;
+		bottomrightx = x + width;
+		bottomrighty = y + height;
+		rectangle(frame, Point(x, y), Point(bottomrightx, bottomrighty), Scalar( 0, 0, 255 ), 2);
+	}
+
+     cout << truenooffaces << "\n";
+
+    fin.close();
 }
