@@ -12,13 +12,26 @@
 using namespace cv;
 using namespace std;
 
+ifstream fin("dataGTNoEntrySigns/dataNoEntry0gt.txt");
+ofstream fout("imageResultsFaces/noentry2facesresults.txt");
+
+/** Global variables */
+String cascade_name = "NoEntrycascade/cascade.xml";
+CascadeClassifier cascade;
+
+/*Global vectors of detected frontal faces and actual ground truths*/
+vector<Rect> noentrysign;
+vector<Rect> gtnoentrysign;
+
 const int maxRadius = 150;
 
 vector<double> roLocations;
 vector<double> thetaLocations;
+vector<Point> roThetaLoc;
+
 
 typedef struct LineParameters {
-	double m, c, theta, ro;
+	//double m, c, theta, ro;
     Point pointStart, pointFinish;
 }LineParameters;
 
@@ -290,7 +303,7 @@ void hough(Mat gradientDirection, Mat gradientMagnitude, int***& accumulator, Ma
 	vector<CircleParameters> cp;
 	CircleParameters circleParamsStructure;
 
-	extractNoOfCirclesAndTheirCenteres(gradientDirection, accumulatorImage, circlesCount, circlesCenters, 30);
+	extractNoOfCirclesAndTheirCenteres(gradientDirection, accumulatorImage, circlesCount, circlesCenters, 55);
 	cout << "The number of circles found in the image is: " << circlesCount << "\n";
 
 	getCirclesParamsAndDraw(circlesCenters, accumulator, image, circleParamsStructure, cp);
@@ -302,6 +315,38 @@ void hough(Mat gradientDirection, Mat gradientMagnitude, int***& accumulator, Ma
 bool checkLineDim(int ro, int diag) {
 	return ((ro > 0) && (ro < diag));
 }
+
+void clearNeighbours(Mat& image, int minDist, int& linesnumber, vector<Point>& pixels) {
+
+	linesnumber = 0;
+	
+	for (int y = 0; y < image.rows; y++) {
+		for (int x = 0; x < image.cols; x++) {
+			if (image.at<double>(y, x) == 255) {
+				
+				Point p;
+				
+				p.x = x;
+				p.y = y;
+
+				bool flag = true;
+				for (int j = 0; j < pixels.size(); j++) {
+					if (abs(p.x - pixels[j].x) < minDist && abs(p.y - pixels[j].y < minDist)) {
+						flag = false;
+						break;
+					}
+					
+				}
+		
+				if (flag) {
+					linesnumber++;
+					pixels.push_back(p);
+				}
+			}
+		}
+	}
+}
+
 
 void getHoughLinesSpace(Mat magnitudeImage, Mat gradDirection, Mat image, vector<double>& thetaLocations, 
 							vector<double>& roLocations, Mat& houghSpaceLines, unsigned int deltaTheta) {
@@ -329,15 +374,18 @@ void getHoughLinesSpace(Mat magnitudeImage, Mat gradDirection, Mat image, vector
 				//convert value of theta into degrees
 				int thetaDgr = (thetaRad * 180) / M_PI + 180;  //180 needs to be added to keep the values in range 0 - 360
 				//cout << "thetaDgr: " << thetaDgr << "\n";
-				for (int i = thetaDgr - deltaTheta; i <= thetaDgr + deltaTheta; i++) {
+				//for (int i = thetaDgr - deltaTheta; i <= thetaDgr + deltaTheta; i++) {
+					for (int i = 0; i < 360; i++) {	
 					//allowing some room for error in the gradient direction can cause some 
 					//very small or very big values for theta to lie outside the range, thus 
 					//some form of normalization is needed
-					int normDgr = (i + 360) % 360;
+					//double normDgr = (i + 360) % 360;
+					double normDgr = i;
 					//in order to write the equation of the line in polar coordinates, we still need to work with radians
-					double thetaVal = (normDgr - 180) * M_PI / 180;
+					//double thetaVal = (normDgr - 180) * M_PI / 180;
+					double thetaVal = normDgr * M_PI / 180.0;
 					//equation of the line in polar coordinates
-					float currentRo = (x * cos(thetaVal)) + (y * sin(thetaVal));
+					float currentRo = (y * cos(thetaVal)) + (x * sin(thetaVal));
 					//cout << "currentRo: " << currentRo << "\n";
 					if (checkLineDim(currentRo, ro)) {
 						houghSpaceLines.at<double>(currentRo, normDgr)++; //here I am gathering "votes" for the coordinates of the peacks
@@ -351,187 +399,117 @@ void getHoughLinesSpace(Mat magnitudeImage, Mat gradDirection, Mat image, vector
 		}	
 	}
 
-	imageTH(houghSpaceLines, houghSpaceLines, 40);
-
 	//normalize the image
-	normalize(houghSpaceLines, houghSpaceLines, 0, 255, NORM_MINMAX);
-
-	//Pursue by iterating through the thresholded image and store the ro-theta locations 
-	for (int y = 0; y < houghSpaceLines.rows; y++) {
-		for (int x = 0; x < houghSpaceLines.cols; x++) {
-			if (houghSpaceLines.at<double>(y, x) == 255) {
-				roLocations.push_back(y);
-				//cout << "ro coord: " << x << "\n";
-				thetaLocations.push_back(x);
-				//cout << "theta coord: " << y << "\n";
-			}
-		}
-	}
-
-	imwrite("houghSpaceLines.jpg", houghSpaceLines);
+	//normalize(houghSpaceLines, houghSpaceLines, 0, 255, NORM_MINMAX);
 
 
-	// Mat displayhoughSpace(ro, 360, CV_64F);
-
-    // for (int x = 0; x < ro; x++) {
-    //     for (int y = 0; y < 360; y++) {
-    //         displayhoughSpace.at<double>(x,y) += houghSpaceLines.at<double>(x, y);  
-    //     }
-    // }
-
-    // Mat houghSpaceNomalised(ro, 360, CV_64F);
-    // normalize(displayhoughSpace, houghSpaceNomalised, 0, 255, NORM_MINMAX);
-
-    // imwrite( "houghLineOuput.jpg", houghSpaceNomalised );
-
-	//normalize the image
-	// normalize(houghSpaceLines, houghSpaceLines, 0, 255, NORM_MINMAX);
-
-	//We are keen on finding the very peacks constructed in "houghSpaceLines", the ro-theta coordinates of the lines
-	//thus, thresholding is desirable.
-	//imageTH(houghSpaceLines, houghSpaceLines, 50);
+	imageTH(houghSpaceLines, houghSpaceLines, houghSpaceLines.cols/2);
 
 	//Pursue by iterating through the thresholded image and store the ro-theta locations 
 	// for (int y = 0; y < houghSpaceLines.rows; y++) {
 	// 	for (int x = 0; x < houghSpaceLines.cols; x++) {
 	// 		if (houghSpaceLines.at<double>(y, x) == 255) {
 	// 			roLocations.push_back(y);
-	// 			cout << "theta coord: " << x;
+	// 			cout << "ro coord: " << y << "\n";
 	// 			thetaLocations.push_back(x);
-	// 			cout << "ro coord: " << y;
+	// 			cout << "theta coord: " << x << "\n";
 	// 		}
 	// 	}
 	// }
-	//imwrite("houghSpaceLines.jpg", houghSpaceLines);
+
+	imwrite("houghSpaceLines.jpg", houghSpaceLines);
 }
 
 int getLineEq(int x, float m, float c) {
 	return (m * x + c);
 }
 
-// imshow(im); %// Show the image
-// hold on; %// Hold so we can draw lines
-// numLines = numel(rho); %// or numel(theta);
-
-// %// These are constant and never change
-// x0 = 1;
-// xend = size(im,2); %// Get the width of the image
-
-// %// For each rho,theta pair...
-// for idx = 1 : numLines
-//     r = rho(idx); th = theta(idx); %// Get rho and theta
-
-//     %// if a vertical line, then draw a vertical line centered at x = r
-//     if (th == 0)
-//         line([r r], [1 size(im,1)], 'Color', 'blue');
-//     else
-//         %// Compute starting y coordinate
-//         y0 = (-cosd(th)/sind(th))*x0 + (r / sind(th)); %// Note theta in degrees to respect your convention
-
-//         %// Compute ending y coordinate
-//         yend = (-cosd(th)/sind(th))*xend + (r / sind(th));
-
-//         %// Draw the line
-//         line([x0 xend], [y0 yend], 'Color', 'blue');
-//    end
-// end
-
-void extractLinesFromPeacks(Mat& originalImage, vector<double> thetaLocations,
-							vector<double> roLocations, Mat houghSpaceLines) {
-	
-	//originalImage.create(houghSpaceLines.rows, houghSpaceLines.cols, CV_64F);
+void extractLinesFromPeacks(Mat& originalImage, Mat houghSpaceLines, vector<Point> roThetaLocations) {
 
 	vector<LineParameters> lineCoordinates;
 
-	//ine(originalImage, Point(5, 5), Point(100, 100), (0, 0, 255), 5);
+	int linesno;
+	//vector<Point> roThetaLocations;
+	clearNeighbours(houghSpaceLines, 20, linesno, roThetaLocations);
+	cout << "LINES NO: " << linesno << "\n";
 
-	//const int xStart = 0, xEnd = originalImage.cols, xHeight = originalImage.rows;
-	const int xStart = 0, xEnd = houghSpaceLines.cols, xHeight = houghSpaceLines.rows;
+	const int xStart = 0, xEnd = originalImage.cols, xHeight = originalImage.rows;
 	int yStart, yEnd;
 
-	//cout << thetaLocations.size();
-	//cout << roLocations.size();
+	//cout << roThetaLocations.size();
 
-	for (int i = 0; i < roLocations.size(); i++) {
+	for (int i = 0; i < roThetaLocations.size(); i++) {
 
-		//cout << "eeeeeeeeee";
 		//Point point1, point2;
-		double theta = thetaLocations[i];
-		double rho = roLocations[i];
+		double theta = roThetaLocations[i].x;
+		theta = theta * M_PI / 180.0;
+		double rho = roThetaLocations[i].y;
      	double m, c;
 		//double radians = theta * (M_PI/ 180);
 
 		//cout << radians;
 
 		m = - cos(theta) / sin(theta);
-		cout << "m :" << m << "\n";
+		//cout << "m :" << m << "\n";
 		c = rho / sin(theta);
-		cout << "c: " << c << "\n";
+		//cout << "c: " << c << "\n";
 
 		if (theta == 0) {
-			//cout << "Aici1";
+
 			Point point1(rho, rho);
 			Point point2(1, xHeight);
 			line(originalImage, point1, point2, (0, 0, 255), 2);
 		} else {
-			//cout << "Aici2";
+			
 			yStart = m * xStart + c;
-			cout << "YSTART: " << yStart << "\n";
+			//cout << "YSTART: " << yStart << "\n";
 			yEnd = m * xEnd + c;
-			cout << "YEND: " << yStart << "\n";
-			Point p1(xStart, xEnd);
-			Point p2(yStart, yEnd);
+			//cout << "YEND: " << yStart << "\n";
+			Point p1(xStart, yStart);
+			Point p2(xEnd, yEnd);
+		
 			line(originalImage, p1, p2, (0, 0, 255), 2);
 		}
 	}
-
-
-	// for (int ro = 0; ro < houghSpaceLines.rows; ro++) {
-	// 	for (int theta = 0; theta < houghSpaceLines.cols; theta++) {
-	// 		if (houghSpaceLines.at<double>(ro, theta) == 255) {
-	// 			/*Equations documented from OpenCV official documentation*/
-
-	// 			double a = cos(theta), b = sin(theta);
-    // 			double x0 = a*ro, y0 = b*ro;
-    // 			Point pt1(cvRound(x0 + 1000*(-b)),
-    //           	cvRound(y0 + 1000*(a)));
-    // 			Point pt2(cvRound(x0 - 1000*(-b)),
-    //           	cvRound(y0 - 1000*(a)));
-    // 			line( evidenceLines, pt1, pt2, Scalar(0,0,255), 3, 8 );
-	// 			// float thetaRad = (theta - 180) * M_PI / 180;
-
-				// float m = - cos(thetaRad) / sin(thetaRad);
-                // float c = ro / sin(thetaRad);
-				
-				// Point pStart(200, getLineEq(200, m, c));
-				// Point pFinish(300, getLineEq(300, m, c));
-
-				// line(evidenceLines, pStart, pFinish, Scalar(0, 0, 255), 2);
-			//}
-		//}
-	//}
-	//imwrite("arataLinii.jpg", evidenceLines);
 }
 
-// void hough(Mat gradImag, int*** &Accumulator) {
-// int Radius;
-// cv::Mat paddedGradImage;
-// cv::copyMakeBorder(gradImag, paddedGradImage,
-// 55, 55, 55, 55, cv::BORDER_CONSTANT);
-// //cout << paddedGradImage.rows << " " << paddedGradImage.cols;
-// for (int y = 0; y < paddedGradImage.rows; y++) {
-// for (int x = 0; x < paddedGradImage.cols; x++) {
-// if (paddedGradImage.at<uchar>(y, x) == 255) {
-// for (int m = y - 50; m <= y + 50; m++) {
-// for (int n = x - 50; n <= x + 50; n++) {
-// Radius = (int)sqrt((y - m) * (y - m) + (x - n) * (x - n));
-// Accumulator[m][n][Radius]++;
-// }
-// }
-// }
-// }
-// }
-// }
+
+/** @function detectAndDisplay */
+/*void detectAndDisplay( Mat frame )
+{
+    int x, y, width, height, bottomrightx, bottomrighty;
+
+	//std::vector<Rect> faces;
+	Mat frame_gray;
+
+	// 1. Prepare Image by turning it into Grayscale and normalising lighting
+	cvtColor( frame, frame_gray, CV_BGR2GRAY );
+	equalizeHist( frame_gray, frame_gray );
+
+	// 2. Perform Viola-Jones Object Detection 
+	cascade.detectMultiScale( frame_gray, noentrysign, 1.1, 1, 0|CV_HAAR_SCALE_IMAGE, Size(10, 10), Size(300,300) );
+
+       // 3. Print number of Faces found
+	std::cout << noentrysign.size() << std::endl;
+
+       // 4. Draw box around faces found
+	for( int i = 0; i < noentrysign.size(); i++ )
+	{
+		rectangle(frame, Point(noentrysign[i].x, noentrysign[i].y), Point(noentrysign[i].x + noentrysign[i].width, noentrysign[i].y + noentrysign[i].height), Scalar( 0, 255, 0 ), 2);
+	}
+		//5. Draw red box around ground truth. Read the ground truth coordinates from txts.
+		// Each line contains the top left coordinates of the ground truth box
+		// followed by the width and height of the box.
+    while(fin >> x >> y >> width >> height) {
+		bottomrightx = x + width;
+		bottomrighty = y + height;
+		rectangle(frame, Point(x, y), Point(bottomrightx, bottomrighty), Scalar( 0, 0, 255 ), 2);
+		gtnoentrysign.push_back(Rect(x, y, width, height));
+	}
+
+    fin.close();
+}*/
+
 
 
 int sumRadius[445][545];
@@ -552,7 +530,10 @@ int main(int argc, char** argv) {
 	// 	return -1;
 	// }
 	Mat image;
-    image = imread("No_entry/NoEntry0.bmp", 1);
+    //image = imread("No_entry/NoEntry10.bmp", 1);
+	//image = imread("No_entry/NoEntry0.bmp");
+	image = imread("no_entry.jpg", 1);
+
 	// image = imread(argv[1], 1);
 	// if (image.empty()) {
 	// 	cout << "Not a valid image file!" << endl;
@@ -587,7 +568,7 @@ int main(int argc, char** argv) {
 	//cout << thetaLocations.size();
 	imwrite("houghSpaceLines.jpg", houghSpaceLines);
 
-	extractLinesFromPeacks(image, thetaLocations, roLocations, houghSpaceLines);
+	extractLinesFromPeacks(image, houghSpaceLines, roThetaLoc);
 	imwrite("evidence.jpg", image);
 
 	return 0;
