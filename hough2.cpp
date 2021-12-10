@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <vector>
+#include <string>
 
 using namespace cv;
 using namespace std;
@@ -29,7 +30,6 @@ vector<double> roLocations;
 vector<double> thetaLocations;
 vector<Point> roThetaLoc;
 
-
 typedef struct LineParameters {
 	//double m, c, theta, ro;
     Point pointStart, pointFinish;
@@ -38,6 +38,8 @@ typedef struct LineParameters {
 typedef struct CircleParameters {
 	int x, y, radius;
 }CircleParameters;
+
+//vector<CircleParameters> circles;
 
 int*** malloc3dArray(int dim1, int dim2, int dim3)
 {
@@ -252,7 +254,9 @@ void extractNoOfCirclesAndTheirCenteres(Mat gradientDirection, Mat accImag, int&
 }
 
 void getCirclesParamsAndDraw(vector<Point> circlesCenters, int*** accumulator, 
-								Mat& image, CircleParameters circleparams, vector<CircleParameters>& cp) {
+								Mat& image, CircleParameters circleparams, vector<CircleParameters>& circles) {
+	int count = 0;
+	
 	for (int i = 0; i < circlesCenters.size(); i++) {
 		int maxi = -1;
 		int suitableRadius = -1;
@@ -267,11 +271,12 @@ void getCirclesParamsAndDraw(vector<Point> circlesCenters, int*** accumulator,
 		circle(image, p, suitableRadius, Scalar(255, 0, 0), 3, CV_AA);
 
 		for (int r = 0; r < maxRadius; r++) {
-			if (accumulator[p.y][p.x][r] == maxi) {
+			if (accumulator[p.y][p.x][r] == maxi && suitableRadius == r) {
+				count++;
 				circleparams.x = p.x;
 				circleparams.y = p.y;
 				circleparams.radius = r;
-				cp.push_back(circleparams);
+				circles.push_back(circleparams);
 			}
 		}
 	}
@@ -282,7 +287,7 @@ void hough(Mat gradientDirection, Mat gradientMagnitude, int***& accumulator, Ma
 
 	createHoughSpaceCircles(gradientDirection, gradientMagnitude, accumulator);
 	
-	retainBigVotes(accumulator, gradientDirection, 20);
+	retainBigVotes(accumulator, gradientDirection, 30);
 	
 	int corectRadius;
 	getMostSuitableRadius(accumulator, gradientDirection, corectRadius);
@@ -307,6 +312,37 @@ void hough(Mat gradientDirection, Mat gradientMagnitude, int***& accumulator, Ma
 	cout << "The number of circles found in the image is: " << circlesCount << "\n";
 
 	getCirclesParamsAndDraw(circlesCenters, accumulator, image, circleParamsStructure, cp);
+	//circles.clear();
+
+	Mat copyImage;
+	copyImage = image.clone();
+	Rect boxAroundCenter;
+	Mat croppedBox;
+
+	vector<Rect> boxes;
+	vector<Mat> frames;
+
+	
+	for (int i = 0; i < cp.size(); i++) {
+		Point center(cp[i].x, cp[i].y);
+		int radius = cp[i].radius;
+
+		Rect boxAroundCenter(center.x - radius, center.y - radius, 2 * radius, 2 * radius);
+
+		rectangle(image, Point(boxAroundCenter.x, boxAroundCenter.y), Point(boxAroundCenter.x + boxAroundCenter.width, boxAroundCenter.y + boxAroundCenter.height), Scalar( 255, 255, 255 ), 2);
+
+		boxes.push_back(boxAroundCenter);
+		 
+	}
+
+
+	for (int i = 0; i < boxes.size(); i++) {
+		croppedBox = copyImage(boxes[i]);
+		frames.push_back(croppedBox);
+		//imwrite("testCropped" + to_string(i) + ".jpg", croppedBox);
+		imwrite("testCropped.jpg", croppedBox);
+	}
+	
 	
 	imwrite("houghTHCircles.jpg", accumulatorImage);
 	//imwrite("corectRadius.jpg", corectRadius);
@@ -531,8 +567,8 @@ int main(int argc, char** argv) {
 	// }
 	Mat image;
     //image = imread("No_entry/NoEntry10.bmp", 1);
-	//image = imread("No_entry/NoEntry0.bmp");
-	image = imread("no_entry.jpg", 1);
+	image = imread("No_entry/NoEntry0.bmp");
+	//image = imread("no_entry.jpg", 1);
 
 	// image = imread(argv[1], 1);
 	// if (image.empty()) {

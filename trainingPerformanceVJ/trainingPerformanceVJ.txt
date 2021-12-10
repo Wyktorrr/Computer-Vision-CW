@@ -1,0 +1,12 @@
+Training 0-stage:
+TPR: 1
+FPR: 1
+
+Training 1-stage:
+TPR: 1
+FPR: 0.0160658
+
+Trainig 2-stage:
+TPR: 1
+FPR: 0.000514954
+

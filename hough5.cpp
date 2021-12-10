@@ -15,7 +15,7 @@ using namespace cv;
 using namespace std;
 
 ifstream fin("dataGTNoEntrySigns/dataNoEntry0gt.txt");
-ofstream fout("Subtask3/noentry0results.txt");
+ofstream fout("imageResultsFaces/noentry2facesresults.txt");
 
 /** Global variables */
 String cascade_name = "NoEntrycascade/cascade.xml";
@@ -127,7 +127,6 @@ void computeGradientDirection(Mat image, Mat dx, Mat dy, Mat& gradientDirection)
 }
 
 // Allocate number of rows and columns for the images, perform sobel, magnitude and direction
-//which are all used for the hough spaces.
 void sobel(Mat image, Mat& dx, Mat& dy, Mat& gradientMagnitude, Mat& gradientDirection) {
 	dx.create(image.rows, image.cols, CV_64F);
 	dy.create(image.rows, image.cols, CV_64F);
@@ -227,7 +226,7 @@ void getImageHoughSpace(Mat& accumulatorImage, Mat gradientDirection, int*** acc
 	}
 }
 
-//Only keep one value from the "anthill" of pixels that the hough space creates to extract circles accurately.
+//TODO: Talk about the "anthill"
 void extractNoOfCirclesAndTheirCenteres(Mat gradientDirection, Mat accImag, int& circlesCount, vector<Point>& circlesCenters, int minDist) {
 	
 	circlesCount = 0;
@@ -324,6 +323,15 @@ void clearNeighbours(Mat& image, int minDist, int& linesnumber, vector<Point>& p
 
 void getHoughLinesSpace(Mat magnitudeImage, Mat gradDirection, Mat image, vector<double>& thetaLocations, 
 							vector<double>& roLocations, Mat& houghSpaceLines, unsigned int deltaTheta) {
+	
+	// double rho = 0.0;
+	// double radians = 0.0;
+	// double directionTheta = 0.0;
+	// double directionVal = 0.0;
+	// int angleRange = 1;
+
+	// vector<double> rhoValues;
+	// vector<double> thetaValues;
 
 	const double ro = sqrt((magnitudeImage.rows * magnitudeImage.rows) + (magnitudeImage.cols * magnitudeImage.cols));
 	cout << "ro: " << ro << "\n";
@@ -341,7 +349,7 @@ void getHoughLinesSpace(Mat magnitudeImage, Mat gradDirection, Mat image, vector
 				//cout << "thetaDgr: " << thetaDgr << "\n";
 				//for (int i = thetaDgr - deltaTheta; i <= thetaDgr + deltaTheta; i++) {
 					for (int i = 0; i < 360; i++) {	
-					//I have also tested my system with allowing some room for error in the gradient direction can cause some 
+					//allowing some room for error in the gradient direction can cause some 
 					//very small or very big values for theta to lie outside the range, thus 
 					//some form of normalization is needed
 					//double normDgr = (i + 360) % 360;
@@ -370,7 +378,7 @@ void getHoughLinesSpace(Mat magnitudeImage, Mat gradDirection, Mat image, vector
 
 	//imageTH(houghSpaceLines, houghSpaceLines, houghSpaceLines.cols/2);
 	//imageTH(houghSpaceLines, houghSpaceLines, houghSpaceLines.cols/2 - 20);
-	imageTH(houghSpaceLines, houghSpaceLines, houghSpaceLines.cols/2);
+	imageTH(houghSpaceLines, houghSpaceLines, houghSpaceLines.cols/7);
 
 	//Pursue by iterating through the thresholded image and store the ro-theta locations 
 	// for (int y = 0; y < houghSpaceLines.rows; y++) {
@@ -384,16 +392,60 @@ void getHoughLinesSpace(Mat magnitudeImage, Mat gradDirection, Mat image, vector
 	// 	}
 	// }
 
-	imwrite("houghSpaceLines0.jpg", houghSpaceLines);
+	imwrite("houghSpaceLines.jpg", houghSpaceLines);
 }
+
+// int getLineEq(int x, float m, float c) {
+// 	return (m * x + c);
+// }
 
 void extractLinesFromPeacks(Mat& originalImage, Mat houghSpaceLines, vector<Point>& roThetaLocations) {
 
 	vector<LineParameters> lineCoordinates;
+    // vector<Vec2f> parallelLines;
+    // bool visited[roThetaLocations.size()];
 
 	 int linesno;
 	//vector<Point> roThetaLocations;
 	 clearNeighbours(houghSpaceLines, 20, linesno, roThetaLocations);
+
+    // for (int i = 0; i < roThetaLocations.size(); i++) {
+    //     visited[i] = false;
+    // }
+
+    // for (int i = 0; i < roThetaLocations.size(); i++) {
+    //     int rho = roThetaLocations[i].x;
+    //     int theta = roThetaLocations[i].y;
+
+    //     // if (!visited[i]) {
+    //     //     parallelLines.push_back((rho, theta));
+    //     //     visited[i] = true;
+    //     // }
+
+    //     for (int s = 0; s < roThetaLocations.size(); s++) {
+    //         if (i != s && abs(theta - roThetaLocations[s].y) < 5) {
+    //             if (!visited[i]) {
+	// 				cout << "eeeeee";
+    //                 parallelLines.push_back((roThetaLocations[s].x, roThetaLocations[s].y));
+    //                 visited[i] = true;
+    //             }
+    //         }
+    //     }
+    // }
+
+	// cout << parallelLines.size() <<"-----";
+	// cout << "LINES NO: " << linesno << "\n";
+
+	// for (int i = 0; i < roThetaLocations.size(); i++) {
+	// 	visited[i] = false;
+	// 	for (int j = 0; j < roThetaLocations.size(); j++) {
+	// 		if (abs(roThetaLocations[i].y - roThetaLocations[j].y) < 3 && !visited[j]) {
+	// 			parallelLines.push_back((roThetaLocations[j].x, roThetaLocations[j].y));
+	// 			visited[j] = true;
+	// 		}
+	// 	}
+	// }
+
 
 	const int xStart = 0, xEnd = originalImage.cols, xHeight = originalImage.rows;
 	int yStart, yEnd;
@@ -441,7 +493,7 @@ void hough(Mat gradientDirection, Mat gradientMagnitude, int***& accumulator, Ma
 
 	createHoughSpaceCircles(gradientDirection, gradientMagnitude, accumulator);
 	
-	retainBigVotes(accumulator, gradientDirection, 20);
+	retainBigVotes(accumulator, gradientDirection, 30);
 	
 	int corectRadius;
 	getMostSuitableRadius(accumulator, gradientDirection, corectRadius);
@@ -452,9 +504,9 @@ void hough(Mat gradientDirection, Mat gradientMagnitude, int***& accumulator, Ma
 
 	normalize(accumulatorImage, accumulatorImage, 0, 255, NORM_MINMAX);
 	
+	//imwrite("hough.jpg", accumulatorImage);
+	
 	imageTH(accumulatorImage, accumulatorImage, 100);
-
-    imwrite("Subtask3/houghCircles0.jpg", accumulatorImage);
 	
 	// IDEA: Mark neighbours as visited
 	int circlesCount;
@@ -486,7 +538,7 @@ void hough(Mat gradientDirection, Mat gradientMagnitude, int***& accumulator, Ma
 
 		Rect boxAroundCenter(center.x - radius, center.y - radius, 2 * radius, 2 * radius);
 
-		//rectangle(image, Point(boxAroundCenter.x, boxAroundCenter.y), Point(boxAroundCenter.x + boxAroundCenter.width, boxAroundCenter.y + boxAroundCenter.height), Scalar( 255, 255, 255 ), 2);
+		rectangle(image, Point(boxAroundCenter.x, boxAroundCenter.y), Point(boxAroundCenter.x + boxAroundCenter.width, boxAroundCenter.y + boxAroundCenter.height), Scalar( 255, 255, 255 ), 2);
 
 		boxes.push_back(boxAroundCenter);
 		 
@@ -508,8 +560,6 @@ void hough(Mat gradientDirection, Mat gradientMagnitude, int***& accumulator, Ma
 	// 	 cout << "linii din crop" << lines.size();
 	// 	 lines.clear();
 	// 	 imwrite("evidenceCrop.jpg", frames[i]);
-
-    /** my implementation of depictiong lines in cropped images **/
 		// sobel(frames[i], dxCropped, dyCropped, gradientMagnitudeCropped, gradientDirectionCropped);
 		// imageTH(gradientMagnitudeCropped, gradientMagnitudeCropped, 100);
 		// imwrite("croppedMagnitude.jpg", gradientMagnitudeCropped);
@@ -551,10 +601,10 @@ void detectAndDisplay( Mat frame )
 	std::cout << signs.size() << std::endl;
 
        // 4. Draw box around faces found
-	// for( int i = 0; i < signs.size(); i++ )
-	// {
-	// 	rectangle(frame, Point(signs[i].x, signs[i].y), Point(signs[i].x + signs[i].width, signs[i].y + signs[i].height), Scalar( 0, 255, 0 ), 2);
-	// }
+	for( int i = 0; i < signs.size(); i++ )
+	{
+		rectangle(frame, Point(signs[i].x, signs[i].y), Point(signs[i].x + signs[i].width, signs[i].y + signs[i].height), Scalar( 0, 255, 0 ), 2);
+	}
 		//5. Draw red box around ground truth. Read the ground truth coordinates from txts.
 		// Each line contains the top left coordinates of the ground truth box
 		// followed by the width and height of the box.
@@ -618,7 +668,7 @@ float computeIOU( Rect predictedBox, Rect groundTruthBox ) {
     //cout << "result: "<<result;
 	return result;
 }
-
+/******/
 void keepRectangles(Rect circleBox, Rect violaDetections) {
     
     float result = computeIOU(circleBox, violaDetections);
@@ -692,9 +742,21 @@ int main(int argc, char** argv) {
 		for (j = 0; j < dim2; ++j)
 			for (k = 0; k < dim3; ++k)
 				ipppArr[i][j][k] = 0;
-	
+	// if (argc != 2) {
+	// 	cout << "Expecting a image file to be passed to program" << endl;
+	// 	return -1;
+	// }
+	// Mat image;
+    // image = imread("No_entry/NoEntry0.bmp", 1);
     Mat frame = imread(argv[1], CV_LOAD_IMAGE_COLOR);
-	
+	//image = imread("No_entry/NoEntry0.bmp");
+	//image = imread("no_entry.jpg", 1);
+
+	// image = imread(argv[1], 1);
+	// if (image.empty()) {
+	// 	cout << "Not a valid image file!" << endl;
+	// 	return -1;
+	// }
 	Mat gray_image;
 	cvtColor(frame, gray_image, COLOR_BGR2GRAY);
 	Mat dx;
@@ -710,16 +772,24 @@ int main(int argc, char** argv) {
 	// gradImageTH(gradientMagnitude, gradientMagnitudeTH);
 	imwrite("magnitude_NO_TH.jpg", gradientMagnitude);
 	imageTH(gradientMagnitude, gradientMagnitude, 70);
-	
+	//threshold(gradientMagnitude, gradientMagnitude, 70, 255, THRESH_BINARY);
 	imwrite("dx.jpg", dx);
 	imwrite("dy.jpg", dy);
-	imwrite("Subtask3/magnitude0.jpg", gradientMagnitude);
+	imwrite("magnitude.jpg", gradientMagnitude);
 	imwrite("direction.jpg", gradientDirection);
 	hough(gradientDirection, gradientMagnitude, ipppArr, frame);
-    
-   // cout << "-------------" << boxes.size() << "\n";
-    imwrite("CircleDetections/detected0.png", frame);
 	
+
+	Mat houghSpaceLines;
+	getHoughLinesSpace(gradientMagnitude, gradientDirection, gray_image, 
+						thetaLocations, roLocations, houghSpaceLines, 5);
+	//cout << thetaLocations.size();
+	imwrite("houghSpaceLines.jpg", houghSpaceLines);
+
+	extractLinesFromPeacks(frame, houghSpaceLines, roThetaLoc);
+	//cout << "LINII: " << roThetaLoc.size();
+	imwrite("evidence.jpg", frame);
+
        
 	if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
 
@@ -727,37 +797,20 @@ int main(int argc, char** argv) {
 
     cout << "boxs size:" << boxes.size() << "\n";
     cout << "signs zise:" << signs.size() << "\n";
-    for (int i = 0; i < boxes.size(); i++) {
-        for (int j = 0; j < signs.size(); j++) {
-                keepRectangles(boxes[i], signs[j]);
-                cout << "------" << "\n";
+    for (int i = 0; i < signs.size(); i++) {
+        for (int j = 0; j < boxes.size(); j++) {
+
+                keepRectangles(boxes[j], signs[i]);
         }
     }
 
-    cout << "aici";
-    cout << finalBoxes.size() << "\n";
+    imwrite("CircleDetections/detected.png", frame);
 
-    // imwrite("CircleDetections/detected.png", frame);
-
-	getImageResults(gtsigns, finalBoxes, 0.5);
-
-    for (int i = 0; i < finalBoxes.size(); i++) {
-        rectangle(frame, Point(finalBoxes[i].x, finalBoxes[i].y), Point(finalBoxes[i].x + finalBoxes[i].width, finalBoxes[i].y + finalBoxes[i].height), Scalar( 0, 255, 0 ), 2);
-    }
+    cout << finalBoxes.size() << "merge!!";
+	getImageResults(boxes, signs, 0.5);
 
 	// 5. Save Result Image showing both detected and ground truth boxes
-	imwrite( "Subtask3/detectedSignsNoEntry0.jpg", frame );
-
-
-    Mat houghSpaceLines;
-	getHoughLinesSpace(gradientMagnitude, gradientDirection, gray_image, 
-						thetaLocations, roLocations, houghSpaceLines, 5);
-	//cout << thetaLocations.size();
-	imwrite("Subtask3/houghSpaceLines0.jpg", houghSpaceLines);
-
-	extractLinesFromPeacks(frame, houghSpaceLines, roThetaLoc);
-	//cout << "LINII: " << roThetaLoc.size();
-	//imwrite("evidence.jpg", frame);
+	imwrite( "detectedSigns/detectedSignsNoEntry0.jpg", frame );
 
 
 	return 0;

@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////
 //
-// COMS30121 - face.cpp
+// COMS30121 - signs.cpp
 //
 /////////////////////////////////////////////////////////////////////////////
 
@@ -20,8 +20,8 @@
 using namespace std;
 using namespace cv;
 
-ifstream fin("dataGTFaces/noentry2gtfaces.txt");
-ofstream fout("imageResultsFaces/noentry2facesresults.txt");
+ifstream fin("dataGTNoEntrySigns/dataNoEntry13gt.txt");
+ofstream fout("imageResultsSignsVJ/signsResults13.txt");
 
 /** Function Headers */
 void detectAndDisplay( Mat frame );
@@ -29,12 +29,12 @@ float computeIOU( Rect Box1, Rect Box2 );
 void getImageResults( vector<Rect> gtBoxes, vector<Rect> predBoxes, float threshold );
 
 /** Global variables */
-String cascade_name = "frontalface.xml";
+String cascade_name = "NoEntrycascade/cascade.xml";
 CascadeClassifier cascade;
 
 /*Global vectors of detected frontal faces and actual ground truths*/
-vector<Rect> faces;
-vector<Rect> gtFaces;
+vector<Rect> signs;
+vector<Rect> gtsigns;
 
 
 /** @function main */
@@ -50,10 +50,10 @@ int main( int argc, const char** argv )
 	detectAndDisplay( frame );
 
 	// 4. Compute TPR and F1-score for the given image
-	getImageResults(gtFaces, faces, 0.5);
+	getImageResults(gtsigns, signs, 0.5);
 
 	// 5. Save Result Image showing both detected and ground truth boxes
-	imwrite( "detectedFaces/detectedFacesNoEntry2.jpg", frame );
+	imwrite( "detectedSigns/detectedSignsNoEntry13.jpg", frame );
 
 	return 0;
 }
@@ -71,15 +71,15 @@ void detectAndDisplay( Mat frame )
 	equalizeHist( frame_gray, frame_gray );
 
 	// 2. Perform Viola-Jones Object Detection 
-	cascade.detectMultiScale( frame_gray, faces, 1.1, 1, 0|CV_HAAR_SCALE_IMAGE, Size(10, 10), Size(300,300) );
+	cascade.detectMultiScale( frame_gray, signs, 1.1, 1, 0|CV_HAAR_SCALE_IMAGE, Size(10, 10), Size(300,300) );
 
        // 3. Print number of Faces found
-	std::cout << faces.size() << std::endl;
+	std::cout << signs.size() << std::endl;
 
        // 4. Draw box around faces found
-	for( int i = 0; i < faces.size(); i++ )
+	for( int i = 0; i < signs.size(); i++ )
 	{
-		rectangle(frame, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height), Scalar( 0, 255, 0 ), 2);
+		rectangle(frame, Point(signs[i].x, signs[i].y), Point(signs[i].x + signs[i].width, signs[i].y + signs[i].height), Scalar( 0, 255, 0 ), 2);
 	}
 		//5. Draw red box around ground truth. Read the ground truth coordinates from txts.
 		// Each line contains the top left coordinates of the ground truth box
@@ -88,7 +88,7 @@ void detectAndDisplay( Mat frame )
 		bottomrightx = x + width;
 		bottomrighty = y + height;
 		rectangle(frame, Point(x, y), Point(bottomrightx, bottomrighty), Scalar( 0, 0, 255 ), 2);
-		gtFaces.push_back(Rect(x, y, width, height));
+		gtsigns.push_back(Rect(x, y, width, height));
 	}
 
     fin.close();
@@ -146,18 +146,18 @@ float computeIOU( Rect predictedBox, Rect groundTruthBox ) {
 }
 
 //Compute TPR and F1-score based on IOU 
-void getImageResults(vector<Rect> gtFaces, vector<Rect> faces, float iouThreshold) {
-	int truePositives = 0, falsePositives, falseNegatives, detectedFaces, trueNoOfFaces;
+void getImageResults(vector<Rect> gtFaces, vector<Rect> signs, float iouThreshold) {
+	int truePositives = 0, falsePositives, falseNegatives, detectedSigns, trueNoOfSigns;
 	float iou, TPR, accuracy, precision, recall, F1Score;
 
-	trueNoOfFaces = gtFaces.size();
-	detectedFaces = faces.size();
+	trueNoOfSigns = gtsigns.size();
+	detectedSigns = signs.size();
 
 	//cout << trueNoOfFaces << " " << detectedFaces << "\n";
 
-	for (int i = 0; i < detectedFaces; i++) {
-		for (int j = 0; j < trueNoOfFaces; j++) {
-             iou = computeIOU(faces[i], gtFaces[j]);
+	for (int i = 0; i < detectedSigns; i++) {
+		for (int j = 0; j < trueNoOfSigns; j++) {
+             iou = computeIOU(signs[i], gtsigns[j]);
 
 			 //cout << "iou: " << iou << " ";
 
@@ -167,23 +167,23 @@ void getImageResults(vector<Rect> gtFaces, vector<Rect> faces, float iouThreshol
 		}
 	}
 
-	cout << "detectedFaces: " << detectedFaces << "trueNoOfFaces: " << trueNoOfFaces << "\n";
+	cout << "detectedSigns: " << detectedSigns << "trueNoOfSigns: " << trueNoOfSigns << "\n";
 	cout << "truePositives: " << truePositives << "\n";
 
-	falsePositives = detectedFaces - truePositives;
+	falsePositives = detectedSigns - truePositives;
 	
-	falseNegatives = trueNoOfFaces - truePositives;
+	falseNegatives = trueNoOfSigns - truePositives;
 
 	cout << "falsePositives: " << falsePositives << "\n";
 	cout << "falseNegatives: " << falseNegatives << "\n";
 
-	if (trueNoOfFaces > 0) {
-		TPR = (float)truePositives / (float)trueNoOfFaces;
-	} else if (trueNoOfFaces == 0) {
+	if (trueNoOfSigns > 0) {
+		TPR = (float)truePositives / (float)trueNoOfSigns;
+	} else if (trueNoOfSigns == 0) {
 		TPR = 0;
 	}
 
-	accuracy = (float)truePositives / (float)detectedFaces;
+	accuracy = (float)truePositives / (float)detectedSigns;
 	cout << "accuracy: " << accuracy << "\n";
 	precision = (float)truePositives / (float)(truePositives + falsePositives);
 	cout << "precision: " << precision << "\n";
@@ -191,6 +191,8 @@ void getImageResults(vector<Rect> gtFaces, vector<Rect> faces, float iouThreshol
 	cout << "recall: " << recall << "\n";
 
 	F1Score = (float)(2 * precision * recall) / (float)(precision + recall);
+
+	//cout << F1Score << " " << TPR;
 
 	fout << fixed << showpoint;
 	fout << setprecision(2);
